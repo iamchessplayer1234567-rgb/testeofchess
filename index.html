@@ -1,48 +1,87 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Teste of Chess</title>
+  <title>TesteOfChess</title>
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      background: #111;
+      color: white;
+    }
+    input {
+      padding: 8px;
+      margin: 10px;
+    }
+    button {
+      padding: 8px 15px;
+      cursor: pointer;
+    }
+    a {
+      color: #00ffcc;
+      display: block;
+      margin: 5px;
+    }
+  </style>
 </head>
 <body>
 
-<h1>Teste of Chess ♟️</h1>
+  <h1>TesteOfChess</h1>
+  <p>Enter Chess.com Username</p>
 
-<input type="text" id="username" placeholder="Enter Chess.com Username">
-<button onclick="loadGames()">Load Games</button>
+  <input type="text" id="username" placeholder="Username">
+  <button onclick="loadGames()">Load Games</button>
 
-<div id="output"></div>
+  <div id="results"></div>
 
-<script>
-async function loadGames() {
-  const username = document.getElementById("username").value;
+  <script>
+    async function loadGames() {
+      const username = document.getElementById("username").value.trim();
+      const resultDiv = document.getElementById("results");
+      resultDiv.innerHTML = "Loading...";
 
-  // Get archive list
-  const archiveRes = await fetch(
-    `https://api.chess.com/pub/player/${username}/games/archives`
-  );
-  const archiveData = await archiveRes.json();
+      if (!username) {
+        resultDiv.innerHTML = "Enter username.";
+        return;
+      }
 
-  const latestArchive = archiveData.archives.slice(-1)[0];
+      const now = new Date();
+      let allGames = [];
 
-  // Get latest month games
-  const gamesRes = await fetch(latestArchive);
-  const gamesData = await gamesRes.json();
+      for (let i = 0; i < 3; i++) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
 
-  const outputDiv = document.getElementById("output");
-  outputDiv.innerHTML = "";
+        try {
+          const res = await fetch(`https://api.chess.com/pub/player/${username}/games/${year}/${month}`);
+          const data = await res.json();
+          if (data.games) {
+            allGames = allGames.concat(data.games);
+          }
+        } catch (e) {}
+      }
 
-  gamesData.games.slice(0, 5).forEach(game => {
-    const div = document.createElement("div");
-    div.innerHTML = `
-      <hr>
-      <b>White:</b> ${game.white.username} <br>
-      <b>Black:</b> ${game.black.username} <br>
-      <b>Result:</b> ${game.white.result} vs ${game.black.result}
-    `;
-    outputDiv.appendChild(div);
-  });
-}
-</script>
+      if (allGames.length === 0) {
+        resultDiv.innerHTML = "No games found.";
+        return;
+      }
+
+      allGames.sort((a, b) => b.end_time - a.end_time);
+
+      const lastTwenty = allGames.slice(0, 20);
+
+      resultDiv.innerHTML = "";
+
+      lastTwenty.forEach((game, index) => {
+        const link = document.createElement("a");
+        link.href = game.url;
+        link.target = "_blank";
+        link.textContent = `Game ${index + 1}`;
+        resultDiv.appendChild(link);
+      });
+    }
+  </script>
 
 </body>
 </html>
