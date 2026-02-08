@@ -6,7 +6,43 @@
 <body>
 
 <h1>Teste of Chess ♟️</h1>
-<p>This website will analyze Chess.com games.</p>
+
+<input type="text" id="username" placeholder="Enter Chess.com Username">
+<button onclick="loadGames()">Load Games</button>
+
+<div id="output"></div>
+
+<script>
+async function loadGames() {
+  const username = document.getElementById("username").value;
+
+  // Get archive list
+  const archiveRes = await fetch(
+    `https://api.chess.com/pub/player/${username}/games/archives`
+  );
+  const archiveData = await archiveRes.json();
+
+  const latestArchive = archiveData.archives.slice(-1)[0];
+
+  // Get latest month games
+  const gamesRes = await fetch(latestArchive);
+  const gamesData = await gamesRes.json();
+
+  const outputDiv = document.getElementById("output");
+  outputDiv.innerHTML = "";
+
+  gamesData.games.slice(0, 5).forEach(game => {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <hr>
+      <b>White:</b> ${game.white.username} <br>
+      <b>Black:</b> ${game.black.username} <br>
+      <b>Result:</b> ${game.white.result} vs ${game.black.result}
+    `;
+    outputDiv.appendChild(div);
+  });
+}
+</script>
 
 </body>
 </html>
