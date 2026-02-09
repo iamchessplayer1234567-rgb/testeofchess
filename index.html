@@ -1,105 +1,149 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>TesteOfChess</title>
-  <style>
-    body {
-      font-family: Arial;
-      background: #111;
-      color: white;
-      text-align: center;
-    }
-    input, button {
-      padding: 8px;
-      margin: 10px;
-    }
-    .game {
-      background: #222;
-      margin: 10px;
-      padding: 10px;
-      border-radius: 8px;
-    }
-  </style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TesteOfChess</title>
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard.min.css"/>
+
+<style>
+body {
+  margin:0;
+  font-family:Arial;
+  background: linear-gradient(135deg,#2b1d12,#1a120b);
+  color:white;
+  text-align:center;
+}
+header{
+  background:#3b2a1d;
+  padding:15px;
+  font-size:22px;
+  font-weight:bold;
+}
+.container{
+  padding:20px;
+}
+input{
+  padding:8px;
+}
+button{
+  padding:8px 12px;
+  background:#8b5a2b;
+  color:white;
+  border:none;
+  cursor:pointer;
+}
+#board{
+  width:100%;
+  max-width:400px;
+  margin:20px auto;
+}
+.profile{
+  background:white;
+  color:black;
+  padding:10px;
+  border-radius:8px;
+  max-width:400px;
+  margin:10px auto;
+}
+.eval{
+  font-size:18px;
+  margin-top:10px;
+}
+</style>
 </head>
 <body>
 
-<h1>TesteOfChess</h1>
+<header>TesteOfChess Analysis</header>
 
-<input type="text" id="username" placeholder="Enter username">
-<button onclick="loadGames()">Load Games</button>
+<div class="container">
 
-<div id="results"></div>
+<input type="text" id="username" placeholder="Enter Chess.com Username">
+<button onclick="loadProfile()">Load Profile</button>
+
+<div id="profile"></div>
+
+<div id="board"></div>
+
+<div class="eval">
+Evaluation: <span id="evaluation">0.00</span><br>
+Best Move: <span id="bestmove">-</span>
+</div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stockfish@16.1.0/src/stockfish.js"></script>
 
 <script>
-async function loadGames() {
-  const username = document.getElementById("username").value.trim().toLowerCase();
-  const resultDiv = document.getElementById("results");
-  resultDiv.innerHTML = "Loading...";
 
-  if (!username) {
-    resultDiv.innerHTML = "Enter username.";
-    return;
-  }
+let board;
+let game = new Chess();
+let engine = STOCKFISH();
+engine.postMessage("uci");
 
-  const now = new Date();
-  let allGames = [];
-
-  for (let i = 0; i < 3; i++) {
-    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-
-    try {
-      const res = await fetch(`https://api.chess.com/pub/player/${username}/games/${year}/${month}`);
-      const data = await res.json();
-      if (data.games) {
-        allGames = allGames.concat(data.games);
-      }
-    } catch (e) {}
-  }
-
-  if (allGames.length === 0) {
-    resultDiv.innerHTML = "No games found.";
-    return;
-  }
-
-  allGames.sort((a, b) => b.end_time - a.end_time);
-  const lastTwenty = allGames.slice(0, 20);
-
-  resultDiv.innerHTML = "";
-
-  lastTwenty.forEach((game, index) => {
-    const white = game.white.username.toLowerCase();
-    const black = game.black.username.toLowerCase();
-
-    let playerColor, opponent, result;
-
-    if (white === username) {
-      playerColor = "White";
-      opponent = game.black.username;
-      result = game.white.result;
-    } else {
-      playerColor = "Black";
-      opponent = game.white.username;
-      result = game.black.result;
+engine.onmessage = function(event) {
+  if (event.includes("score cp")) {
+    let match = event.match(/score cp (-?\d+)/);
+    if(match){
+      let evalScore = (match[1]/100).toFixed(2);
+      document.getElementById("evaluation").innerText = evalScore;
     }
+  }
+  if (event.includes("bestmove")) {
+    let best = event.split(" ")[1];
+    document.getElementById("bestmove").innerText = best;
+  }
+};
 
-    // Convert result text
-    if (result === "win") result = "Win";
-    else if (result === "checkmated" || result === "timeout" || result === "resigned" || result === "lose") result = "Loss";
-    else result = "Draw";
+function onDragStart(source, piece) {
+  if (game.game_over()) return false;
+}
 
-    const div = document.createElement("div");
-    div.className = "game";
-    div.innerHTML = `
-      <strong>Game ${index + 1}</strong><br>
-      You played: ${playerColor}<br>
-      Opponent: ${opponent}<br>
-      Result: ${result}
+function onDrop(source, target) {
+  let move = game.move({
+    from: source,
+    to: target,
+    promotion: "q"
+  });
+
+  if (move === null) return "snapback";
+
+  updateEngine();
+}
+
+function updateEngine() {
+  engine.postMessage("position fen " + game.fen());
+  engine.postMessage("go depth 15");
+}
+
+board = Chessboard("board", {
+  draggable: true,
+  position: "start",
+  onDragStart: onDragStart,
+  onDrop: onDrop
+});
+
+function loadProfile(){
+  const username = document.getElementById("username").value.trim();
+  if(!username) return;
+
+  fetch(`https://api.chess.com/pub/player/${username}`)
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById("profile").innerHTML = `
+      <div class="profile">
+        <img src="${data.avatar}" width="60"><br>
+        <strong>${data.username}</strong><br>
+        Followers: ${data.followers}<br>
+        Country: ${data.country.split('/').pop()}
+      </div>
     `;
-    resultDiv.appendChild(div);
   });
 }
+
 </script>
 
 </body>
