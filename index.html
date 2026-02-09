@@ -5,83 +5,102 @@
   <style>
     body {
       font-family: Arial;
-      text-align: center;
       background: #111;
       color: white;
+      text-align: center;
     }
-    input {
+    input, button {
       padding: 8px;
       margin: 10px;
     }
-    button {
-      padding: 8px 15px;
-      cursor: pointer;
-    }
-    a {
-      color: #00ffcc;
-      display: block;
-      margin: 5px;
+    .game {
+      background: #222;
+      margin: 10px;
+      padding: 10px;
+      border-radius: 8px;
     }
   </style>
 </head>
 <body>
 
-  <h1>TesteOfChess</h1>
-  <p>Enter Chess.com Username</p>
+<h1>TesteOfChess</h1>
 
-  <input type="text" id="username" placeholder="Username">
-  <button onclick="loadGames()">Load Games</button>
+<input type="text" id="username" placeholder="Enter username">
+<button onclick="loadGames()">Load Games</button>
 
-  <div id="results"></div>
+<div id="results"></div>
 
-  <script>
-    async function loadGames() {
-      const username = document.getElementById("username").value.trim();
-      const resultDiv = document.getElementById("results");
-      resultDiv.innerHTML = "Loading...";
+<script>
+async function loadGames() {
+  const username = document.getElementById("username").value.trim().toLowerCase();
+  const resultDiv = document.getElementById("results");
+  resultDiv.innerHTML = "Loading...";
 
-      if (!username) {
-        resultDiv.innerHTML = "Enter username.";
-        return;
+  if (!username) {
+    resultDiv.innerHTML = "Enter username.";
+    return;
+  }
+
+  const now = new Date();
+  let allGames = [];
+
+  for (let i = 0; i < 3; i++) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+
+    try {
+      const res = await fetch(`https://api.chess.com/pub/player/${username}/games/${year}/${month}`);
+      const data = await res.json();
+      if (data.games) {
+        allGames = allGames.concat(data.games);
       }
+    } catch (e) {}
+  }
 
-      const now = new Date();
-      let allGames = [];
+  if (allGames.length === 0) {
+    resultDiv.innerHTML = "No games found.";
+    return;
+  }
 
-      for (let i = 0; i < 3; i++) {
-        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
+  allGames.sort((a, b) => b.end_time - a.end_time);
+  const lastTwenty = allGames.slice(0, 20);
 
-        try {
-          const res = await fetch(`https://api.chess.com/pub/player/${username}/games/${year}/${month}`);
-          const data = await res.json();
-          if (data.games) {
-            allGames = allGames.concat(data.games);
-          }
-        } catch (e) {}
-      }
+  resultDiv.innerHTML = "";
 
-      if (allGames.length === 0) {
-        resultDiv.innerHTML = "No games found.";
-        return;
-      }
+  lastTwenty.forEach((game, index) => {
+    const white = game.white.username.toLowerCase();
+    const black = game.black.username.toLowerCase();
 
-      allGames.sort((a, b) => b.end_time - a.end_time);
+    let playerColor, opponent, result;
 
-      const lastTwenty = allGames.slice(0, 20);
-
-      resultDiv.innerHTML = "";
-
-      lastTwenty.forEach((game, index) => {
-        const link = document.createElement("a");
-        link.href = game.url;
-        link.target = "_blank";
-        link.textContent = `Game ${index + 1}`;
-        resultDiv.appendChild(link);
-      });
+    if (white === username) {
+      playerColor = "White";
+      opponent = game.black.username;
+      result = game.white.result;
+    } else {
+      playerColor = "Black";
+      opponent = game.white.username;
+      result = game.black.result;
     }
-  </script>
+
+    // Convert result text
+    if (result === "win") result = "Win";
+    else if (result === "checkmated" || result === "timeout" || result === "resigned" || result === "lose") result = "Loss";
+    else result = "Draw";
+
+    const div = document.createElement("div");
+    div.className = "game";
+    div.innerHTML = `
+      <strong>Game ${index + 1}</strong><br>
+      You played: ${playerColor}<br>
+      Opponent: ${opponent}<br>
+      Result: ${result}
+    `;
+    resultDiv.appendChild(div);
+  });
+}
+</script>
 
 </body>
 </html>
